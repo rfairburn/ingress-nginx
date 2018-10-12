@@ -19,7 +19,7 @@ CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
 
 COPY . /
 
-RUN clean-install bash
+RUN clean-install bash ca-certificates
 
 RUN /build.sh
 

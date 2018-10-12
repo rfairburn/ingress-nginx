@@ -1,0 +1,29 @@
+--- a/src/event/ngx_event_openssl.c	2018-10-11 15:21:49.000000000 -0500
++++ b/src/event/ngx_event_openssl.c	2018-10-11 15:26:58.000000000 -0500
+@@ -153,6 +153,10 @@
+     OPENSSL_config(NULL);
+ 
+     SSL_library_init();
++    if (FIPS_mode_set(1) == 0) {
++        ngx_ssl_error(NGX_LOG_ALERT, log, 0, "FIPS_mode_set() failed");
++        return NGX_ERROR;
++    }
+     SSL_load_error_strings();
+ 
+     OpenSSL_add_all_algorithms();
+
+--- a/auto/lib/openssl/make	2018-10-11 16:33:26.000000000 -0500
++++ b/auto/lib/openssl/make	2018-10-11 17:21:03.000000000 -0500
+@@ -51,9 +51,9 @@
+ $OPENSSL/.openssl/include/openssl/ssl.h:	$NGX_MAKEFILE
+ 	cd $OPENSSL \\
+ 	&& if [ -f Makefile ]; then \$(MAKE) clean; fi \\
+-	&& ./config --prefix=$ngx_prefix no-shared no-threads $OPENSSL_OPT \\
+-	&& \$(MAKE) \\
+-	&& \$(MAKE) install_sw LIBDIR=lib
++	&& CC=$(which gcc) ./config --prefix=$ngx_prefix no-shared no-threads $OPENSSL_OPT \\
++	&& CC=$(which gcc) \$(MAKE) \\
++	&& CC=$(which gcc) \$(MAKE) install_sw LIBDIR=lib
+ 
+ END
+ 

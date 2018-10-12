@@ -13,8 +13,8 @@
 # limitations under the License.
 
 # 0.0.0 shouldn't clobber any released builds
-TAG ?= 0.64
-REGISTRY ?= quay.io/kubernetes-ingress-controller
+TAG ?= 0.64-fips
+REGISTRY ?= registry.spideroak.com/kubernetes-ingress-controller
 ARCH ?= $(shell go env GOARCH)
 DOCKER ?= docker
 

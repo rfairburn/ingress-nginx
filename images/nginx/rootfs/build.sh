@@ -19,6 +19,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+export OPENSSL_FIPS=1
+export OPENSSL_VERSION=1.0.2o
+export OPENSSL_FIPS_VERSION=2.0.16
 export NGINX_VERSION=1.15.5
 export NDK_VERSION=0.3.1rc1
 export SETMISC_VERSION=0.32
@@ -145,6 +148,13 @@ mkdir --verbose -p "$BUILD_PATH"
 cd "$BUILD_PATH"
 
 # download, verify and extract the source files
+
+get_src a3cd13d0521d22dd939063d3b4a0d4ce24494374b91408a05bdaca8b681c63d4 \
+        "https://www.openssl.org/source/openssl-fips-$OPENSSL_FIPS_VERSION.tar.gz"
+
+get_src ec3f5c9714ba0fd45cb4e087301eb1336c317e0d20b575a125050470e8089e4d \
+        "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz"
+
 get_src 1a3a889a8f14998286de3b14cc1dd5b2747178e012d6d480a18aa413985dae6f \
         "http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz"
 
@@ -236,6 +246,23 @@ export MAKEFLAGS=-j${CORES}
 export CTEST_BUILD_FLAGS=${MAKEFLAGS}
 export HUNTER_JOBS_NUMBER=${CORES}
 
+# OpenSSL FIPS
+cd "$BUILD_PATH/openssl-fips-$OPENSSL_FIPS_VERSION"
+KERNEL_BITS=64 ./config
+make
+make install
+
+# OpenSSL
+cd "$BUILD_PATH/openssl-$OPENSSL_VERSION"
+KERNEL_BITS=64 ./config fips
+make
+make install
+
+export CC="/usr/local/ssl/fips-2.0/bin/fipsld"
+export FIPSLD_CC="$(which gcc)"
+export CXX="/usr/local/ssl/fips-2.0/bin/fipsld++"
+export FIPSLD_CXX="$(which g++)"
+
 # Installing luarocks packages
 if [[ ${ARCH} == "x86_64" ]]; then
   luarocks install lrexlib-pcre 2.7.2-1
@@ -281,6 +308,7 @@ if [[ (${ARCH} != "ppc64le") && (${ARCH} != "s390x") ]]; then
 
   # build and install lua-resty-waf with dependencies
   /install_lua_resty_waf.sh
+  ln -s /usr/local/lib/libluajit-5.1.so.2 /usr/lib/
 fi
 
 # install openresty-gdb-utils
@@ -438,8 +466,10 @@ Include /etc/nginx/owasp-modsecurity-crs/rules/RESPONSE-999-EXCLUSION-RULES-AFTE
 # build nginx
 cd "$BUILD_PATH/nginx-$NGINX_VERSION"
 
+
 # apply Nginx patches
 patch -p1 < /patches/openresty-ssl_cert_cb_yield.patch
+patch -p1 < /patches/fips_ngx_event_openssl.patch 
 
 WITH_FLAGS="--with-debug \
   --with-compat \
@@ -459,7 +489,9 @@ WITH_FLAGS="--with-debug \
   --with-stream_ssl_preread_module \
   --with-threads \
   --with-http_secure_link_module \
-  --with-http_gunzip_module"
+  --with-http_gunzip_module \
+  --with-openssl-opt=fips \
+  --with-openssl=$BUILD_PATH/openssl-$OPENSSL_VERSION"
 
 if [[ ${ARCH} != "armv7l" || ${ARCH} != "aarch64" ]]; then
   WITH_FLAGS+=" --with-file-aio"
